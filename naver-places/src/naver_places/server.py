@@ -1,6 +1,6 @@
 from fastmcp import FastMCP
 
-mcp = FastMCP("naver-mcp")
+mcp = FastMCP("naver-places")
 
 
 @mcp.tool

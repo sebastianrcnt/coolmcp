@@ -1,9 +1,9 @@
 [project]
-name = "naver-mcp"
+name = "coolmcp"
 version = "0.1.0"
-description = "Add your description here"
+description = "A monorepo of Naver MCP servers"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = [
-    "fastmcp>=3.4.2",
-]
+
+[tool.uv.workspace]
+members = ["naver-places"]
