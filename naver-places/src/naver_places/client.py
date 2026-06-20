@@ -2,6 +2,7 @@ import httpx
 
 from .graphql.client import NaverPlaceGraphQLClient
 from .graphql import queries
+from .errors import NaverAPIError
 from .types import (
     InstantSearchResponse,
     FollowingReviewsResult,
@@ -49,11 +50,18 @@ async def instant_search(
     cookies: dict[str, str],
 ) -> InstantSearchResponse:
     async with httpx.AsyncClient(headers=_SEARCH_HEADERS, cookies=cookies) as client:
-        response = await client.get(
-            INSTANT_SEARCH_URL,
-            params={"query": query, "coords": coords},
-        )
-        response.raise_for_status()
+        try:
+            response = await client.get(
+                INSTANT_SEARCH_URL,
+                params={"query": query, "coords": coords},
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise NaverAPIError(
+                f"Naver search failed (HTTP {exc.response.status_code})"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise NaverAPIError(f"Naver search failed: {exc}") from exc
         return InstantSearchResponse.model_validate(response.json())
 
 

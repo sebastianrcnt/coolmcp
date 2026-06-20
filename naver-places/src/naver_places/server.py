@@ -12,7 +12,7 @@ from .client import (
 from .cookies import list_chrome_profiles
 from .html import fetch_place_detail
 from .images import fetch_place_images
-from .session import get_session_cookies
+from .session import check_naver_login, get_session_cookies
 from . import views
 
 mcp = FastMCP("naver-places")
@@ -31,6 +31,18 @@ def list_available_chrome_profiles() -> list[str]:
     session the server uses. Authentication is otherwise automatic.
     """
     return list_chrome_profiles()
+
+
+@mcp.tool
+def check_naver_auth() -> dict:
+    """Check whether the configured Chrome profile has a usable Naver session.
+
+    Reports cookieCount, hasNaverSession (public search/reviews work),
+    isLoggedIn (personalized features like following reviews work), and a
+    human-readable message. Call this first if other tools return empty results
+    or fail with an authentication error.
+    """
+    return check_naver_login()
 
 
 @mcp.tool

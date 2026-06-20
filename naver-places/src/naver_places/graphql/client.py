@@ -6,6 +6,8 @@ import httpx
 from gql import GraphQLRequest
 from graphql import print_ast
 
+from ..errors import NaverAPIError
+
 PCMAP_GRAPHQL_URL = "https://pcmap-api.place.naver.com/graphql"
 
 _HEADERS = {
@@ -75,7 +77,23 @@ class NaverPlaceGraphQLClient:
         async with httpx.AsyncClient(
             headers=self._headers, cookies=self._cookies
         ) as client:
-            response = await client.post(PCMAP_GRAPHQL_URL, json=payload)
-            response.raise_for_status()
+            try:
+                response = await client.post(PCMAP_GRAPHQL_URL, json=payload)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise NaverAPIError(
+                    f"Naver GraphQL request failed (HTTP {exc.response.status_code})"
+                ) from exc
+            except httpx.RequestError as exc:
+                raise NaverAPIError(f"Naver GraphQL request failed: {exc}") from exc
+
             batch = response.json()
-            return [item["data"] for item in batch]
+            results: list[dict[str, Any]] = []
+            for item in batch:
+                if item.get("errors"):
+                    messages = "; ".join(
+                        e.get("message", "unknown error") for e in item["errors"]
+                    )
+                    raise NaverAPIError(f"Naver GraphQL error: {messages}")
+                results.append(item.get("data"))
+            return results

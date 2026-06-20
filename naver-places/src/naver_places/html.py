@@ -3,6 +3,7 @@ import re
 
 import httpx
 
+from .errors import NaverAPIError
 from .types.place import PlaceDetail, PlaceReviewSummary
 
 PCMAP_PLACE_URL = "https://pcmap.place.naver.com/place/{place_id}/home"
@@ -33,7 +34,9 @@ _APOLLO_STATE_RE = re.compile(
 def _extract_apollo_state(html: str) -> dict:
     m = _APOLLO_STATE_RE.search(html)
     if not m:
-        raise ValueError("__APOLLO_STATE__ not found in HTML")
+        raise NaverAPIError(
+            "Could not parse place page (Naver layout changed or access was blocked)."
+        )
     return json.loads(m.group(1))
 
 
@@ -98,8 +101,15 @@ async def fetch_place_detail(
         default_params.update(params)
 
     async with httpx.AsyncClient(headers=_HEADERS, cookies=cookies) as client:
-        response = await client.get(url, params=default_params)
-        response.raise_for_status()
+        try:
+            response = await client.get(url, params=default_params)
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise NaverAPIError(
+                f"Naver place page failed (HTTP {exc.response.status_code})"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise NaverAPIError(f"Naver place page failed: {exc}") from exc
 
     state = _extract_apollo_state(response.text)
     return _parse_place_detail(place_id, state)

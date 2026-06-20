@@ -1,13 +1,19 @@
 """Image fetching for review photos.
 
-Downloads the bytes of review photos so MCP tools can return them as
-viewable image content. Video entries (mediaType == "video") are skipped
-because their URLs are stream/trailer URLs, not still images.
+Downloads review photo bytes so MCP tools can return them as viewable image
+content. Images are downscaled (long edge <= 1024px, re-encoded as JPEG) to keep
+the payload and vision-token cost small. Video entries are skipped.
 """
 
+import io
+
 import httpx
+from PIL import Image as PILImage
 
 from .client import get_review_photos
+
+_MAX_DIMENSION = 1024
+_JPEG_QUALITY = 80
 
 _IMAGE_HEADERS = {
     "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -35,6 +41,29 @@ def _format_from_content_type(content_type: str | None) -> str:
     return _CONTENT_TYPE_TO_FORMAT.get(ct, "jpeg")
 
 
+def _downscale(data: bytes) -> tuple[bytes, str]:
+    """Downscale to <= _MAX_DIMENSION on the long edge, re-encode as JPEG.
+
+    Returns (jpeg_bytes, "jpeg"). On any failure returns the original bytes
+    with format "jpeg" (best effort).
+    """
+    try:
+        img = PILImage.open(io.BytesIO(data))
+        img.load()
+        # Already a small JPEG within bounds: keep as-is to avoid re-encoding
+        # (which can enlarge an already well-compressed image and lose quality).
+        if img.format == "JPEG" and max(img.size) <= _MAX_DIMENSION:
+            return data, "jpeg"
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        img.thumbnail((_MAX_DIMENSION, _MAX_DIMENSION))
+        out = io.BytesIO()
+        img.save(out, format="JPEG", quality=_JPEG_QUALITY)
+        return out.getvalue(), "jpeg"
+    except Exception:
+        return data, "jpeg"
+
+
 async def fetch_image_bytes(url: str) -> tuple[bytes, str]:
     """Download a single image. Returns (raw_bytes, format) e.g. (b'...', 'jpeg')."""
     async with httpx.AsyncClient(headers=_IMAGE_HEADERS) as client:
@@ -49,19 +78,20 @@ async def fetch_place_images(
     cookies: dict[str, str],
     limit: int = 5,
 ) -> list[dict]:
-    """Fetch up to `limit` still-image review photos as raw bytes.
+    """Fetch up to `limit` still-image review photos, downscaled.
 
-    Skips videos. Returns a list of dicts:
-        {"data": bytes, "format": str, "text": str | None, "url": str}
-    Photos that fail to download are skipped.
+    Skips videos and entries without a URL. Returns a list of dicts:
+        {"data": bytes, "format": "jpeg", "text": str | None, "url": str}
+    Photos that fail to download or decode are skipped.
     """
     photos = await get_review_photos(place_id, cookies)
-    images = [p for p in photos if p.mediaType != "video"]
+    images = [p for p in photos if p.mediaType != "video" and p.originalUrl]
 
     results: list[dict] = []
     for photo in images[:limit]:
         try:
-            data, fmt = await fetch_image_bytes(photo.originalUrl)
+            raw, _ = await fetch_image_bytes(photo.originalUrl)
+            data, fmt = _downscale(raw)
         except Exception:
             continue
         results.append(
