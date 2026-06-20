@@ -1,0 +1,116 @@
+import httpx
+
+from .graphql.client import NaverPlaceGraphQLClient
+from .graphql import queries
+from .types import (
+    InstantSearchResponse,
+    FollowingReviewsResult,
+    ReviewPhoto,
+    ThemeListsResult,
+    VisitorReviewsResult,
+)
+
+INSTANT_SEARCH_URL = "https://map.naver.com/p/api/search/instant-search"
+
+_SEARCH_HEADERS = {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4",
+    "cache-control": "no-cache",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "referer": "https://map.naver.com/p?c=15.00,0,0,0,dh",
+    "sec-ch-ua": '"Google Chrome";v="149", "Chromium";v="149", "Not)A;Brand";v="24"',
+    "sec-ch-ua-arch": '"arm"',
+    "sec-ch-ua-bitness": '"64"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-model": '""',
+    "sec-ch-ua-platform": '"macOS"',
+    "sec-ch-ua-platform-version": '"26.5.1"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "user-agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/149.0.0.0 Safari/537.36"
+    ),
+}
+
+
+async def instant_search(
+    query: str,
+    coords: str,
+    cookies: dict[str, str],
+) -> InstantSearchResponse:
+    async with httpx.AsyncClient(headers=_SEARCH_HEADERS, cookies=cookies) as client:
+        response = await client.get(
+            INSTANT_SEARCH_URL,
+            params={"query": query, "coords": coords},
+        )
+        response.raise_for_status()
+        return InstantSearchResponse.model_validate(response.json())
+
+
+async def get_visitor_reviews(
+    place_id: str,
+    cookies: dict[str, str],
+    size: int = 10,
+    cursor: str | None = None,
+) -> VisitorReviewsResult:
+    variables: dict = {
+        "input": {
+            "businessId": place_id,
+            "businessType": "place",
+            "item": "0",
+            "bookingBusinessId": None,
+            "size": size,
+            "includeContent": True,
+            "getUserStats": True,
+            "includeReceiptPhotos": True,
+            "getReactions": True,
+            "getTrailer": True,
+        }
+    }
+    if cursor:
+        variables["input"]["cursor"] = cursor
+
+    gql_client = NaverPlaceGraphQLClient(place_id, cookies)
+    data = await gql_client.execute(queries.VISITOR_RATING_REVIEWS, variables)
+    return VisitorReviewsResult.model_validate(data["visitorReviews"])
+
+
+async def get_review_photos(
+    place_id: str,
+    cookies: dict[str, str],
+) -> list[ReviewPhoto]:
+    variables = {
+        "input": {
+            "businessId": place_id,
+            "businessType": "place",
+            "type": "FLAT",
+        }
+    }
+    gql_client = NaverPlaceGraphQLClient(place_id, cookies)
+    data = await gql_client.execute(queries.VISITOR_REVIEW_PHOTOS, variables)
+    return [ReviewPhoto.model_validate(p) for p in data["visitorReviewPhotos"]]
+
+
+async def get_following_reviews(
+    place_id: str,
+    cookies: dict[str, str],
+) -> FollowingReviewsResult:
+    variables = {"input": {"businessId": place_id}}
+    gql_client = NaverPlaceGraphQLClient(place_id, cookies)
+    data = await gql_client.execute(queries.FOLLOWING_REVIEWS, variables)
+    return FollowingReviewsResult.model_validate(data["followingReviews"])
+
+
+async def get_theme_lists(
+    place_id: str,
+    cookies: dict[str, str],
+    display: int = 3,
+) -> ThemeListsResult:
+    variables = {"input": {"businessId": place_id, "display": display}}
+    gql_client = NaverPlaceGraphQLClient(place_id, cookies)
+    data = await gql_client.execute(queries.VISITOR_REVIEW_THEME_LISTS, variables)
+    return ThemeListsResult.model_validate(data["themeLists"])
