@@ -5,7 +5,11 @@ decryption key. Chrome does not need to be closed — SQLite WAL mode allows
 concurrent reads while Chrome is running.
 """
 
+from pathlib import Path
+
 from pycookiecheat import chrome_cookies
+
+_CHROME_BASE = Path.home() / "Library/Application Support/Google/Chrome"
 
 # Domains that Naver APIs are called against
 _NAVER_DOMAINS = [
@@ -16,21 +20,33 @@ _NAVER_DOMAINS = [
 ]
 
 
-def get_naver_cookies(chrome_profile: str | None = None) -> dict[str, str]:
-    """Read Naver session cookies from the Chrome cookie database.
+def list_chrome_profiles() -> list[str]:
+    """Return available Chrome profile names (e.g. ["Default", "Profile 4"])."""
+    return sorted(
+        p.name
+        for p in _CHROME_BASE.iterdir()
+        if (p / "Cookies").exists()
+    )
+
+
+def get_naver_cookies(profile: str = "Default") -> dict[str, str]:
+    """Read Naver session cookies from a Chrome profile's cookie database.
 
     Args:
-        chrome_profile: Path to a Chrome profile directory. Defaults to the
-                        system default profile.
+        profile: Chrome profile name, e.g. "Default", "Profile 4".
+                 Run list_chrome_profiles() to see available profiles.
 
     Returns:
         Merged dict of cookies for all Naver domains.
     """
-    kwargs = {}
-    if chrome_profile:
-        kwargs["cookie_file"] = chrome_profile
+    cookie_file = _CHROME_BASE / profile / "Cookies"
+    if not cookie_file.exists():
+        raise FileNotFoundError(
+            f"Cookie file not found: {cookie_file}\n"
+            f"Available profiles: {list_chrome_profiles()}"
+        )
 
     merged: dict[str, str] = {}
     for domain in _NAVER_DOMAINS:
-        merged.update(chrome_cookies(domain, **kwargs))
+        merged.update(chrome_cookies(domain, cookie_file=str(cookie_file)))
     return merged
