@@ -148,3 +148,13 @@ def test_graphql_queries_have_operation_names_and_print():
     assert _operation_name(queries.PHOTO_VIEWER) == "getPhotoViewerItems"
     printed = print_ast(queries.VISITOR_REVIEWS.document)
     assert "visitorReviews" in printed
+
+
+def test_image_url_allowlist():
+    from naver_places.images import _is_allowed_image_url
+
+    assert _is_allowed_image_url("https://pup-review-phinf.pstatic.net/x.jpg")
+    assert _is_allowed_image_url("https://phinf.pstatic.net/y.jpg")
+    assert not _is_allowed_image_url("https://evil.com/x.jpg")
+    assert not _is_allowed_image_url("http://localhost/x")
+    assert not _is_allowed_image_url("not a url")

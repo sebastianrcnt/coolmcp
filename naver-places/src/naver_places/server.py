@@ -11,7 +11,7 @@ from .client import (
 )
 from .cookies import list_chrome_profiles
 from .html import fetch_place_detail
-from .images import fetch_place_images
+from .images import fetch_images_from_urls, fetch_place_images
 from .session import check_naver_login, get_session_cookies
 from . import views
 
@@ -88,24 +88,41 @@ async def get_place_visitor_reviews(
 
 
 @mcp.tool
-async def get_place_images(place_id: str, limit: int = 5) -> list[Image]:
-    """Fetch actual review photo images for a Naver place as viewable image content.
+async def get_place_images(
+    place_id: str | None = None,
+    urls: list[str] | None = None,
+    limit: int = 5,
+) -> list[Image]:
+    """Fetch review photos as viewable image content (the model can SEE them).
 
-    Returns the images themselves (not URLs) so they can be viewed directly.
-    Videos are skipped.
+    These image bytes are token-expensive. To minimize tokens, FIRST call
+    get_place_review_photos to get photo URLs + captions cheaply, then pass only
+    the URLs you actually want to view here as `urls`.
+
+    Provide either `urls` (view those specific photos; only Naver CDN URLs are
+    accepted) or `place_id` (view the first `limit` review photos). If both are
+    given, `urls` wins. Videos are skipped.
 
     Args:
-        place_id: Naver place ID (e.g. "1709318030")
+        place_id: Naver place ID (e.g. "1709318030"); used when `urls` is omitted
+        urls: Specific Naver review-photo URLs to fetch and view
         limit: Maximum number of images to fetch (default 5)
     """
-    items = await fetch_place_images(place_id, get_session_cookies(), limit=limit)
+    if urls:
+        items = await fetch_images_from_urls(urls, limit=limit)
+    elif place_id:
+        items = await fetch_place_images(place_id, get_session_cookies(), limit=limit)
+    else:
+        return []
     return [Image(data=item["data"], format=item["format"]) for item in items]
 
 
 @mcp.tool
 async def get_place_review_photos(place_id: str) -> list[dict]:
     """Fetch metadata (URLs, captions, media type) of review photos/videos for a
-    Naver place. Use get_place_images to actually view the images.
+    Naver place. This is the CHEAP path: it returns URLs and captions only, no
+    image bytes. To actually view chosen photos, pass their URLs to
+    get_place_images(urls=...).
 
     Args:
         place_id: Naver place ID (e.g. "1709318030")

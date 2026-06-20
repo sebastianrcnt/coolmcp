@@ -26,7 +26,7 @@ Use the `list_available_chrome_profiles` tool to see which profile names exist o
 - `search_places(query, coords=None)` — search places by keyword. `coords` is an optional "lat,lng" string that only affects distance ranking; if omitted a default Seoul-center coordinate is used.
 - `get_place_detail(place_id)` — name, address, phone, score, review totals, and top review keywords.
 - `get_place_visitor_reviews(place_id, size=10, after=None)` — visitor reviews; `after` is a pagination cursor.
-- `get_place_images(place_id, limit=5)` — returns actual review photo images as viewable image content the model can see (videos skipped).
+- `get_place_images(place_id=None, urls=None, limit=5)` — returns review photos as viewable image content (the model can see them; videos skipped). Image bytes are token-expensive: prefer calling `get_place_review_photos` first for cheap URLs, then pass the URLs you want to view as `urls`. Only Naver CDN URLs are accepted.
 - `get_place_review_photos(place_id)` — metadata list of review photos/videos (URLs, captions), no image bytes.
 - `get_place_photo_gallery(place_id, cursors=None)` — paginated photo gallery metadata with full dimensions/cursors.
 - `get_place_following_reviews(place_id)` — reviews from accounts the logged-in user follows.

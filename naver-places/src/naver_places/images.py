@@ -6,6 +6,7 @@ the payload and vision-token cost small. Video entries are skipped.
 """
 
 import io
+from urllib.parse import urlparse
 
 import httpx
 from PIL import Image as PILImage
@@ -14,6 +15,24 @@ from .client import get_review_photos
 
 _MAX_DIMENSION = 1024
 _JPEG_QUALITY = 80
+
+# SSRF guard: only fetch images from Naver's CDN/domains.
+_ALLOWED_IMAGE_HOST_SUFFIXES = (".pstatic.net", ".naver.net", ".naver.com")
+
+
+def _is_allowed_image_url(url: str) -> bool:
+    """True only if url's host is a Naver CDN/domain (SSRF guard)."""
+    try:
+        host = (urlparse(url).hostname or "").lower()
+    except Exception:
+        return False
+    if not host:
+        return False
+    return any(
+        host == suffix.lstrip(".") or host.endswith(suffix)
+        for suffix in _ALLOWED_IMAGE_HOST_SUFFIXES
+    )
+
 
 _IMAGE_HEADERS = {
     "accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
@@ -85,7 +104,13 @@ async def fetch_place_images(
     Photos that fail to download or decode are skipped.
     """
     photos = await get_review_photos(place_id, cookies)
-    images = [p for p in photos if p.mediaType != "video" and p.originalUrl]
+    images = [
+        p
+        for p in photos
+        if p.mediaType != "video"
+        and p.originalUrl
+        and _is_allowed_image_url(p.originalUrl)
+    ]
 
     results: list[dict] = []
     for photo in images[:limit]:
@@ -97,4 +122,22 @@ async def fetch_place_images(
         results.append(
             {"data": data, "format": fmt, "text": photo.text, "url": photo.originalUrl}
         )
+    return results
+
+
+async def fetch_images_from_urls(urls: list[str], limit: int = 5) -> list[dict]:
+    """Fetch specific image URLs (downscaled). Non-Naver-CDN URLs are rejected
+    (SSRF guard). Returns dicts: {"data": bytes, "format": "jpeg", "text": None, "url": str}.
+    URLs that fail or are rejected are skipped.
+    """
+    results: list[dict] = []
+    for url in urls[:limit]:
+        if not _is_allowed_image_url(url):
+            continue
+        try:
+            raw, _ = await fetch_image_bytes(url)
+            data, fmt = _downscale(raw)
+        except Exception:
+            continue
+        results.append({"data": data, "format": fmt, "text": None, "url": url})
     return results
