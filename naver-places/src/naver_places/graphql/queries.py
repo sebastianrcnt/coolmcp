@@ -46,6 +46,92 @@ query getVisitorReviewPhotosInVisitorReviewTab($input: VisitorReviewPhotosInput)
 }
 """)
 
+PHOTO_VIEWER = gql("""
+query getPhotoViewerItems($input: PhotoViewerInput, $isNmap: Boolean = false) {
+  photoViewer(input: $input) {
+    cursors {
+      id
+      startIndex
+      hasNext
+      lastCursor
+    }
+    photos {
+      viewId
+      originalUrl
+      originalDate
+      width
+      height
+      title
+      text
+      desc
+      link
+      date
+      photoType
+      mediaType
+      option {
+        channelName
+        dateString
+        playCount
+        likeCount
+      }
+      to
+      relation
+      logId
+      author {
+        id
+        nickname
+        from
+        imageUrl
+        objectId
+        url
+        borderImageUrl
+        officialYn
+      }
+      votedKeywords {
+        code
+        iconUrl
+        iconCode
+        name
+      }
+      visitCount
+      originType
+      isFollowing
+      businessName
+      rating
+      externalLink {
+        title
+        url
+      }
+      sourceTitle
+      moment {
+        channelId
+        contentId
+        momentId
+        gdid
+        blogRelation
+        statAllowYn
+        category
+        docNo
+      }
+      video {
+        videoId
+        videoUrl
+        trailerUrl
+      }
+      music {
+        artists
+        title
+      }
+      clip {
+        serviceType
+        createdAt
+        contentType
+      }
+    }
+  }
+}
+""")
+
 FOLLOWING_REVIEWS = gql("""
 query getFollowingReviews($input: FollowingReviewsInput) {
   followingReviews(input: $input) {
@@ -147,13 +233,13 @@ query getFollowingReviews($input: FollowingReviewsInput) {
 }
 """)
 
-VISITOR_RATING_REVIEWS = gql("""
-query getVisitorRatingReviews($input: VisitorReviewsInput) {
+VISITOR_REVIEWS = gql("""
+query getVisitorReviews($input: VisitorReviewsInput) {
   visitorReviews(input: $input) {
-    total
     items {
       id
       cursor
+      reviewId
       rating
       author {
         id
@@ -175,9 +261,23 @@ query getVisitorRatingReviews($input: VisitorReviewsInput) {
         followerCount
         followRequested
       }
+      body
+      thumbnail
+      media {
+        type
+        thumbnail
+        thumbnailRatio
+        class
+        videoId
+        videoUrl
+        trailerUrl
+      }
+      tags
+      status
       visitCount
+      viewCount
       visited
-      originType
+      created
       reply {
         editUrl
         body
@@ -189,15 +289,28 @@ query getVisitorRatingReviews($input: VisitorReviewsInput) {
         isSuspended
         status
       }
+      originType
+      item {
+        name
+        code
+        options
+      }
+      language
+      highlightRanges {
+        start
+        end
+      }
+      apolloCacheId
+      translatedText
+      businessName
+      showBookingItemName
+      bookingItemName
       votedKeywords {
         code
         iconUrl
         iconCode
-        displayName
         name
       }
-      businessName
-      status
       userIdno
       loginIdno
       receiptInfoUrl
@@ -214,6 +327,33 @@ query getVisitorRatingReviews($input: VisitorReviewsInput) {
         reacted
       }
       nickname
+      showPaymentInfo
+      visitCategories {
+        code
+        name
+        keywords {
+          code
+          name
+        }
+      }
+      representativeVisitDateTime
+      showRepresentativeVisitDateTime
+    }
+    starDistribution {
+      score
+      count
+    }
+    hideProductSelectBox
+    total
+    showRecommendationSort
+    itemReviewStats {
+      score
+      count
+      itemId
+      starDistribution {
+        score
+        count
+      }
     }
   }
 }

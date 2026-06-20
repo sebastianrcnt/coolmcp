@@ -5,6 +5,7 @@ from .graphql import queries
 from .types import (
     InstantSearchResponse,
     FollowingReviewsResult,
+    PhotoViewerResult,
     ReviewPhoto,
     ThemeListsResult,
     VisitorReviewsResult,
@@ -55,7 +56,7 @@ async def get_visitor_reviews(
     place_id: str,
     cookies: dict[str, str],
     size: int = 10,
-    cursor: str | None = None,
+    after: str | None = None,
 ) -> VisitorReviewsResult:
     variables: dict = {
         "input": {
@@ -64,6 +65,7 @@ async def get_visitor_reviews(
             "item": "0",
             "bookingBusinessId": None,
             "size": size,
+            "isPhotoUsed": False,
             "includeContent": True,
             "getUserStats": True,
             "includeReceiptPhotos": True,
@@ -71,11 +73,11 @@ async def get_visitor_reviews(
             "getTrailer": True,
         }
     }
-    if cursor:
-        variables["input"]["cursor"] = cursor
+    if after:
+        variables["input"]["after"] = after
 
     gql_client = NaverPlaceGraphQLClient(place_id, cookies)
-    data = await gql_client.execute(queries.VISITOR_RATING_REVIEWS, variables)
+    data = await gql_client.execute(queries.VISITOR_REVIEWS, variables)
     return VisitorReviewsResult.model_validate(data["visitorReviews"])
 
 
@@ -93,6 +95,40 @@ async def get_review_photos(
     gql_client = NaverPlaceGraphQLClient(place_id, cookies)
     data = await gql_client.execute(queries.VISITOR_REVIEW_PHOTOS, variables)
     return [ReviewPhoto.model_validate(p) for p in data["visitorReviewPhotos"]]
+
+
+async def get_photo_viewer(
+    place_id: str,
+    cookies: dict[str, str],
+    cursors: list[dict] | None = None,
+    exclude_author_ids: list[str] | None = None,
+    date_range: str = "",
+) -> PhotoViewerResult:
+    """Fetch photo gallery with cursor-based pagination.
+
+    Args:
+        place_id: Naver place ID
+        cookies: Naver session cookies
+        cursors: List of cursor dicts from a previous response to paginate.
+                 Each dict: {"id": str, "startIndex": int, "hasNext": bool, "lastCursor": str|None}
+        exclude_author_ids: Author IDs to exclude
+        date_range: Date filter string
+    """
+    variables = {
+        "isNmap": False,
+        "input": {
+            "businessId": place_id,
+            "businessType": "place",
+            "cursors": cursors or [],
+            "excludeAuthorIds": exclude_author_ids or [],
+            "excludeSection": [],
+            "excludeClipIds": [],
+            "dateRange": date_range,
+        },
+    }
+    gql_client = NaverPlaceGraphQLClient(place_id, cookies)
+    data = await gql_client.execute(queries.PHOTO_VIEWER, variables)
+    return PhotoViewerResult.model_validate(data["photoViewer"])
 
 
 async def get_following_reviews(

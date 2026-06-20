@@ -2,11 +2,13 @@ from fastmcp import FastMCP
 
 from .client import (
     get_following_reviews,
+    get_photo_viewer,
     get_review_photos,
     get_theme_lists,
     get_visitor_reviews,
     instant_search,
 )
+from .html import fetch_place_detail
 
 mcp = FastMCP("naver-places")
 
@@ -23,13 +25,27 @@ async def search_places(
         query: Search term in Korean or English (e.g. "파리바게트", "starbucks")
         coords: "lat,lng" decimal string (e.g. "37.5144,127.0667")
         cookies: Naver session cookies from a logged-in browser session
-
-    Returns:
-        List of matching places with id, title, address, coordinates, category,
-        review count, and distance.
     """
     response = await instant_search(query, coords, cookies)
     return [item.model_dump() for item in response.place]
+
+
+@mcp.tool
+async def get_place_detail(
+    place_id: str,
+    cookies: dict[str, str],
+) -> dict:
+    """Fetch rich place details by parsing the pcmap place home page.
+
+    Returns name, address, phone, coordinates, opening hours, review stats,
+    and keyword analysis (votedKeyword breakdown).
+
+    Args:
+        place_id: Naver place ID (e.g. "1709318030")
+        cookies: Naver session cookies from a logged-in browser session
+    """
+    detail = await fetch_place_detail(place_id, cookies)
+    return detail.model_dump()
 
 
 @mcp.tool
@@ -37,7 +53,7 @@ async def get_place_visitor_reviews(
     place_id: str,
     cookies: dict[str, str],
     size: int = 10,
-    cursor: str | None = None,
+    after: str | None = None,
 ) -> dict:
     """Fetch visitor reviews for a Naver place.
 
@@ -45,13 +61,9 @@ async def get_place_visitor_reviews(
         place_id: Naver place ID (e.g. "1709318030")
         cookies: Naver session cookies from a logged-in browser session
         size: Number of reviews to fetch (default 10)
-        cursor: Pagination cursor from a previous response to fetch the next page
-
-    Returns:
-        Dict with "total" count and "items" list. Each item includes rating,
-        author info, visitCount, visited date, votedKeywords, reply, and reactionStat.
+        after: Pagination cursor (cursor field from a previous item) for next page
     """
-    result = await get_visitor_reviews(place_id, cookies, size=size, cursor=cursor)
+    result = await get_visitor_reviews(place_id, cookies, size=size, after=after)
     return result.model_dump()
 
 
@@ -60,18 +72,34 @@ async def get_place_review_photos(
     place_id: str,
     cookies: dict[str, str],
 ) -> list[dict]:
-    """Fetch visitor review photos for a Naver place.
+    """Fetch the flat list of visitor review photos/videos for a Naver place.
 
     Args:
         place_id: Naver place ID (e.g. "1709318030")
         cookies: Naver session cookies from a logged-in browser session
-
-    Returns:
-        List of photos/videos with originalUrl, mediaType, review text, date,
-        author, votedKeywords, and video stream URLs when mediaType is "video".
     """
     photos = await get_review_photos(place_id, cookies)
     return [p.model_dump() for p in photos]
+
+
+@mcp.tool
+async def get_place_photo_gallery(
+    place_id: str,
+    cookies: dict[str, str],
+    cursors: list[dict] | None = None,
+) -> dict:
+    """Fetch the photo gallery viewer for a Naver place with cursor pagination.
+
+    Returns photos with full metadata (dimensions, music, clip, moment info)
+    and cursors for fetching the next page.
+
+    Args:
+        place_id: Naver place ID (e.g. "1709318030")
+        cookies: Naver session cookies from a logged-in browser session
+        cursors: Cursor list from a previous response to fetch the next page
+    """
+    result = await get_photo_viewer(place_id, cookies, cursors=cursors)
+    return result.model_dump()
 
 
 @mcp.tool
@@ -84,10 +112,6 @@ async def get_place_following_reviews(
     Args:
         place_id: Naver place ID (e.g. "1709318030")
         cookies: Naver session cookies from a logged-in browser session
-
-    Returns:
-        Dict with "reviews" list and "reactionTypes". Reviews are empty when the
-        logged-in user has no followings who visited this place.
     """
     result = await get_following_reviews(place_id, cookies)
     return result.model_dump()
@@ -105,10 +129,6 @@ async def get_place_theme_lists(
         place_id: Naver place ID (e.g. "1709318030")
         cookies: Naver session cookies from a logged-in browser session
         display: Number of theme lists to return (default 3)
-
-    Returns:
-        Dict with "total" count and "themeLists". Each theme list has title,
-        viewCount, itemCount, sample reviews, and author info.
     """
     result = await get_theme_lists(place_id, cookies, display=display)
     return result.model_dump()
