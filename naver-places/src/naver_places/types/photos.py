@@ -64,11 +64,11 @@ class PhotoAuthor(BaseModel):
 # ── Visitor Review Photos (getVisitorReviewPhotosInVisitorReviewTab) ──────────
 
 class ReviewPhoto(BaseModel):
-    viewId: str = ""
-    originalUrl: str = ""
-    photoType: str = ""
-    mediaType: str = ""  # "image" | "video"
-    logId: str = ""
+    viewId: str | None = None
+    originalUrl: str | None = None
+    photoType: str | None = None
+    mediaType: str | None = None  # "image" | "video"
+    logId: str | None = None
     relation: str | None = None
     title: str | None = None
     text: str | None = None

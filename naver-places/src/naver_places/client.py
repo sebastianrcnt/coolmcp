@@ -13,6 +13,11 @@ from .types import (
 
 INSTANT_SEARCH_URL = "https://map.naver.com/p/api/search/instant-search"
 
+# Initial cursor for the photo viewer: start of the visitor-review photo section.
+_INITIAL_PHOTO_CURSORS = [
+    {"id": "placeReview", "startIndex": 0, "hasNext": True, "lastCursor": None}
+]
+
 _SEARCH_HEADERS = {
     "accept": "application/json, text/plain, */*",
     "accept-language": "ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4",
@@ -111,15 +116,15 @@ async def get_photo_viewer(
         cookies: Naver session cookies
         cursors: List of cursor dicts from a previous response to paginate.
                  Each dict: {"id": str, "startIndex": int, "hasNext": bool, "lastCursor": str|None}
+                 When omitted, starts from the beginning of the visitor-review photo section.
         exclude_author_ids: Author IDs to exclude
         date_range: Date filter string
     """
     variables = {
-        "isNmap": False,
         "input": {
             "businessId": place_id,
             "businessType": "place",
-            "cursors": cursors or [],
+            "cursors": cursors if cursors is not None else _INITIAL_PHOTO_CURSORS,
             "excludeAuthorIds": exclude_author_ids or [],
             "excludeSection": [],
             "excludeClipIds": [],

@@ -3,7 +3,8 @@ import json
 from typing import Any
 
 import httpx
-from graphql import DocumentNode, print_ast
+from gql import GraphQLRequest
+from graphql import print_ast
 
 PCMAP_GRAPHQL_URL = "https://pcmap-api.place.naver.com/graphql"
 
@@ -31,8 +32,8 @@ def _wtm_header(place_id: str) -> str:
     return base64.b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
 
 
-def _operation_name(doc: DocumentNode) -> str:
-    return doc.definitions[0].name.value  # type: ignore[attr-defined]
+def _operation_name(request: GraphQLRequest) -> str:
+    return request.document.definitions[0].name.value  # type: ignore[attr-defined]
 
 
 class NaverPlaceGraphQLClient:
@@ -53,23 +54,23 @@ class NaverPlaceGraphQLClient:
 
     async def execute(
         self,
-        document: DocumentNode,
+        request: GraphQLRequest,
         variables: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        results = await self.execute_batch([(document, variables or {})])
+        results = await self.execute_batch([(request, variables or {})])
         return results[0]
 
     async def execute_batch(
         self,
-        operations: list[tuple[DocumentNode, dict[str, Any]]],
+        operations: list[tuple[GraphQLRequest, dict[str, Any]]],
     ) -> list[dict[str, Any]]:
         payload = [
             {
-                "operationName": _operation_name(doc),
+                "operationName": _operation_name(request),
                 "variables": variables,
-                "query": print_ast(doc),
+                "query": print_ast(request.document),
             }
-            for doc, variables in operations
+            for request, variables in operations
         ]
         async with httpx.AsyncClient(
             headers=self._headers, cookies=self._cookies

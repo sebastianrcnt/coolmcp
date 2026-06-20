@@ -47,7 +47,7 @@ query getVisitorReviewPhotosInVisitorReviewTab($input: VisitorReviewPhotosInput)
 """)
 
 PHOTO_VIEWER = gql("""
-query getPhotoViewerItems($input: PhotoViewerInput, $isNmap: Boolean = false) {
+query getPhotoViewerItems($input: PhotoViewerInput) {
   photoViewer(input: $input) {
     cursors {
       id

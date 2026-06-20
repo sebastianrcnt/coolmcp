@@ -790,6 +790,7 @@ source = { editable = "naver-places" }
 dependencies = [
     { name = "fastmcp" },
     { name = "gql" },
+    { name = "httpx" },
     { name = "pycookiecheat" },
 ]
 
@@ -797,6 +798,7 @@ dependencies = [
 requires-dist = [
     { name = "fastmcp", specifier = ">=3.4.2" },
     { name = "gql", specifier = ">=4.0.0" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "pycookiecheat", specifier = ">=0.8.0" },
 ]
 
