@@ -14,6 +14,7 @@ dependencies = [
 
 [project.scripts]
 naver-places = "naver_places.cli:cli"
+naver-places-mcp = "naver_places.server:main"
 
 [build-system]
 requires = ["hatchling"]

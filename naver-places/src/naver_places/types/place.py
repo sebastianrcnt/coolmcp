@@ -1,18 +1,20 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from .base import DropNoneModel as _DropNoneModel
 
 
-class Coordinate(BaseModel):
+class Coordinate(_DropNoneModel):
     x: str = ""  # longitude
     y: str = ""  # latitude
 
 
-class OpeningHours(BaseModel):
+class OpeningHours(_DropNoneModel):
     businessStatus: dict | None = None
     offdayHolidays: list | None = None
     regularlyDay: list | None = None
 
 
-class VotedKeywordDetail(BaseModel):
+class VotedKeywordDetail(_DropNoneModel):
     category: str | None = None
     code: str = ""
     iconUrl: str | None = None
@@ -22,25 +24,25 @@ class VotedKeywordDetail(BaseModel):
     previousRank: int | None = None
 
 
-class VotedKeywordStats(BaseModel):
+class VotedKeywordStats(_DropNoneModel):
     totalCount: int = 0
     reviewCount: int = 0
     userCount: int = 0
     details: list[VotedKeywordDetail] = Field(default_factory=list)
 
 
-class ReviewStatsAnalysis(BaseModel):
+class ReviewStatsAnalysis(_DropNoneModel):
     themes: list = Field(default_factory=list)
     menus: list = Field(default_factory=list)
     votedKeyword: VotedKeywordStats | None = None
 
 
-class VisitorReviewScore(BaseModel):
+class VisitorReviewScore(_DropNoneModel):
     count: int = 0
     score: float | None = None
 
 
-class VisitorReviewStats(BaseModel):
+class VisitorReviewStats(_DropNoneModel):
     avgRating: float = 0.0
     totalCount: int = 0
     scores: list[VisitorReviewScore] = Field(default_factory=list)
@@ -48,7 +50,7 @@ class VisitorReviewStats(BaseModel):
     authorCount: int = 0
 
 
-class PlaceReviewSummary(BaseModel):
+class PlaceReviewSummary(_DropNoneModel):
     id: str
     name: str | None = None
     review: VisitorReviewStats | None = None
@@ -57,7 +59,7 @@ class PlaceReviewSummary(BaseModel):
     ratingReviewsTotal: int = 0
 
 
-class PlaceDetail(BaseModel):
+class PlaceDetail(_DropNoneModel):
     id: str
     name: str = ""
     category: list[str] = Field(default_factory=list)

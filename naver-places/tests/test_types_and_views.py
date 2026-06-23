@@ -147,6 +147,48 @@ def test_enriched_search_results_merges_detail():
     assert rows[1]["topKeywords"] == []
 
 
+def test_drop_none_model_applies_defaults():
+    # Regression: Naver returns explicit null for missing rating fields; the
+    # null must not blow up non-optional int/float/str fields.
+    from naver_places.types.place import PlaceDetail
+
+    d = PlaceDetail.model_validate({
+        "id": "1",
+        "visitorReviewsTotal": None,
+        "visitorReviewsScore": None,
+        "roadAddress": None,
+    })
+    assert d.visitorReviewsTotal == 0
+    assert d.visitorReviewsScore == 0.0
+    assert d.roadAddress == ""
+
+
+def test_cache_get_or_set_hits_and_expires():
+    import asyncio
+    from naver_places import cache
+
+    cache.clear()
+    calls = {"n": 0}
+
+    async def factory():
+        calls["n"] += 1
+        return calls["n"]
+
+    async def run():
+        # Fresh ttl: second call served from cache (factory not re-run).
+        hit1 = await cache.get_or_set("k", factory, ttl=100)
+        hit2 = await cache.get_or_set("k", factory, ttl=100)
+        # Stale ttl: each call stores an already-expired entry, so it refetches.
+        miss1 = await cache.get_or_set("stale", factory, ttl=-1)
+        miss2 = await cache.get_or_set("stale", factory, ttl=-1)
+        return hit1, hit2, miss1, miss2
+
+    hit1, hit2, miss1, miss2 = asyncio.run(run())
+    assert (hit1, hit2) == (1, 1)       # cached: one factory call
+    assert (miss1, miss2) == (2, 3)     # stale entries never serve
+    cache.clear()
+
+
 def test_naverblog_accepts_object():
     # Regression: some places return naverBlog/talktalkUrl as an object, which
     # previously failed the whole detail parse.

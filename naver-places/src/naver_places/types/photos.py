@@ -1,25 +1,27 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from .base import DropNoneModel
 
 
-class ExternalLink(BaseModel):
+class ExternalLink(DropNoneModel):
     title: str | None = None
     url: str | None = None
 
 
-class VideoInfo(BaseModel):
+class VideoInfo(DropNoneModel):
     videoId: str
     videoUrl: str
     trailerUrl: str | None = None
 
 
-class PhotoOption(BaseModel):
+class PhotoOption(DropNoneModel):
     channelName: str | None = None
     dateString: str | None = None
     playCount: int | None = None
     likeCount: int | None = None
 
 
-class MomentInfo(BaseModel):
+class MomentInfo(DropNoneModel):
     channelId: str | None = None
     contentId: str | None = None
     momentId: str | None = None
@@ -30,25 +32,25 @@ class MomentInfo(BaseModel):
     docNo: str | None = None
 
 
-class MusicInfo(BaseModel):
+class MusicInfo(DropNoneModel):
     artists: list[str] = Field(default_factory=list)
     title: str | None = None
 
 
-class ClipInfo(BaseModel):
+class ClipInfo(DropNoneModel):
     serviceType: str | None = None
     createdAt: str | None = None
     contentType: str | None = None
 
 
-class PhotoVotedKeyword(BaseModel):
+class PhotoVotedKeyword(DropNoneModel):
     code: str = ""
     iconUrl: str | None = None
     iconCode: str | None = None
     name: str = ""
 
 
-class PhotoAuthor(BaseModel):
+class PhotoAuthor(DropNoneModel):
     id: str | None = None
     nickname: str | None = None
     from_: str | None = Field(None, alias="from")
@@ -63,7 +65,7 @@ class PhotoAuthor(BaseModel):
 
 # ── Visitor Review Photos (getVisitorReviewPhotosInVisitorReviewTab) ──────────
 
-class ReviewPhoto(BaseModel):
+class ReviewPhoto(DropNoneModel):
     viewId: str | None = None
     originalUrl: str | None = None
     photoType: str | None = None
@@ -87,14 +89,14 @@ class ReviewPhoto(BaseModel):
 
 # ── Photo Viewer (getPhotoViewerItems) ───────────────────────────────────────
 
-class PhotoViewerCursor(BaseModel):
+class PhotoViewerCursor(DropNoneModel):
     id: str
     startIndex: int
     hasNext: bool
     lastCursor: str | None = None
 
 
-class PhotoViewerImage(BaseModel):
+class PhotoViewerImage(DropNoneModel):
     viewId: str = ""
     originalUrl: str = ""
     originalDate: str | None = None
@@ -126,6 +128,6 @@ class PhotoViewerImage(BaseModel):
     clip: ClipInfo | None = None
 
 
-class PhotoViewerResult(BaseModel):
+class PhotoViewerResult(DropNoneModel):
     cursors: list[PhotoViewerCursor] = Field(default_factory=list)
     photos: list[PhotoViewerImage] = Field(default_factory=list)

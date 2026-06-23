@@ -56,7 +56,7 @@ async def search_places(
     near: str | None = None,
     enrich: bool = False,
     top: int = 3,
-) -> list[dict]:
+) -> dict:
     """Search Naver Maps for places by keyword.
 
     This is an AUTOCOMPLETE-style search, not full-text. Use a SHORT keyword:
@@ -83,6 +83,12 @@ async def search_places(
     get_place_detail. Results are ranked, not strictly filtered, so categories
     may be mixed.
 
+    Returns a dict: {"searchedNear": {...}, "places": [...]}. `searchedNear`
+    reports the ranking center actually used — including `resolvedTo` (the place
+    name a `near` landmark geocoded to) and `source` ("coords"/"near"/"default")
+    — so you can confirm the search centered where you intended. If `source` is
+    "default", `distanceKm` is relative to Seoul center and not meaningful.
+
     Args:
         query: Short keyword in Korean or English (e.g. "순두부찌개", "starbucks")
         coords: Optional explicit "lat,lng" center for ranking/distance
@@ -91,11 +97,13 @@ async def search_places(
         top: How many results to enrich when enrich=True (default 3)
     """
     cookies = get_session_cookies()
-    items, _ = await _search_places(query, cookies, coords=coords, near=near)
+    items, searched_near = await _search_places(query, cookies, coords=coords, near=near)
     if enrich:
         pairs = await enrich_places(items, cookies, top=top)
-        return views.enriched_search_results(pairs)
-    return views.search_results(items)
+        places = views.enriched_search_results(pairs)
+    else:
+        places = views.search_results(items)
+    return {"searchedNear": searched_near, "places": places}
 
 
 @mcp.tool
@@ -209,5 +217,10 @@ async def get_place_theme_lists(place_id: str, display: int = 3) -> dict:
     return views.theme_lists(result)
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Console-script entry point (naver-places-mcp): run the MCP server."""
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

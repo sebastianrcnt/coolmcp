@@ -2,6 +2,7 @@ import asyncio
 
 import httpx
 
+from . import cache
 from .graphql.client import NaverPlaceGraphQLClient
 from .graphql import queries
 from .errors import NaverAPIError
@@ -57,34 +58,40 @@ async def instant_search(
     coords: str,
     cookies: dict[str, str],
 ) -> InstantSearchResponse:
-    async with httpx.AsyncClient(headers=_SEARCH_HEADERS, cookies=cookies) as client:
-        try:
-            response = await client.get(
-                INSTANT_SEARCH_URL,
-                params={"query": query, "coords": coords},
-            )
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise NaverAPIError(
-                f"Naver search failed (HTTP {exc.response.status_code})"
-            ) from exc
-        except httpx.RequestError as exc:
-            raise NaverAPIError(f"Naver search failed: {exc}") from exc
-        return InstantSearchResponse.model_validate(response.json())
+    async def _fetch() -> InstantSearchResponse:
+        async with httpx.AsyncClient(headers=_SEARCH_HEADERS, cookies=cookies) as client:
+            try:
+                response = await client.get(
+                    INSTANT_SEARCH_URL,
+                    params={"query": query, "coords": coords},
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise NaverAPIError(
+                    f"Naver search failed (HTTP {exc.response.status_code})"
+                ) from exc
+            except httpx.RequestError as exc:
+                raise NaverAPIError(f"Naver search failed: {exc}") from exc
+            return InstantSearchResponse.model_validate(response.json())
+
+    return await cache.get_or_set(("search", query, coords), _fetch)
 
 
-async def resolve_coords(near: str, cookies: dict[str, str]) -> str | None:
-    """Geocode a landmark/place name to a "lat,lng" string via instant-search.
+async def resolve_coords(
+    near: str, cookies: dict[str, str]
+) -> tuple[str, str] | None:
+    """Geocode a landmark/place name via instant-search.
 
-    Returns the coordinates of the top matching place, or None if nothing
-    matched. Used so callers can search "near 성균관대" without knowing lat/lng.
+    Returns (coords, resolvedName) of the top matching place — resolvedName lets
+    a caller verify the geocode hit the intended landmark (not a same-named
+    place elsewhere) — or None if nothing matched.
     """
     response = await instant_search(near, DEFAULT_COORDS, cookies)
     places = response.merged_places()
     if not places:
         return None
     top = places[0]
-    return f"{top.y},{top.x}"
+    return f"{top.y},{top.x}", top.title
 
 
 async def search_places(
@@ -92,20 +99,40 @@ async def search_places(
     cookies: dict[str, str],
     coords: str | None = None,
     near: str | None = None,
-) -> tuple[list, str]:
+) -> tuple[list, dict]:
     """Search places, resolving `near` to coordinates when given.
 
     Resolution order for the ranking center: explicit `coords` > geocoded
-    `near` > DEFAULT_COORDS. Returns (merged place items, coords actually used).
+    `near` > DEFAULT_COORDS.
+
+    Returns (merged place items, searchedNear) where searchedNear describes how
+    the ranking center was chosen so callers can verify/expose it:
+        {"coords": <used>, "near": <input or None>,
+         "resolvedTo": <place name geocoded from near, or None>,
+         "source": "coords" | "near" | "default"}
     """
     used_coords = coords
-    if used_coords is None and near:
-        used_coords = await resolve_coords(near, cookies)
-    if used_coords is None:
-        used_coords = DEFAULT_COORDS
+    resolved_to = None
+    if coords is not None:
+        source = "coords"
+    elif near:
+        geo = await resolve_coords(near, cookies)
+        if geo is not None:
+            used_coords, resolved_to = geo
+            source = "near"
+        else:
+            used_coords, source = DEFAULT_COORDS, "default"
+    else:
+        used_coords, source = DEFAULT_COORDS, "default"
 
     response = await instant_search(query, used_coords, cookies)
-    return response.merged_places(), used_coords
+    searched_near = {
+        "coords": used_coords,
+        "near": near,
+        "resolvedTo": resolved_to,
+        "source": source,
+    }
+    return response.merged_places(), searched_near
 
 
 async def enrich_places(

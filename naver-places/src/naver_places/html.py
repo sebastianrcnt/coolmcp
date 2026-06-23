@@ -3,6 +3,7 @@ import re
 
 import httpx
 
+from . import cache
 from .errors import NaverAPIError
 from .types.place import PlaceDetail, PlaceReviewSummary
 
@@ -100,16 +101,22 @@ async def fetch_place_detail(
     if params:
         default_params.update(params)
 
-    async with httpx.AsyncClient(headers=_HEADERS, cookies=cookies, follow_redirects=True) as client:
-        try:
-            response = await client.get(url, params=default_params)
-            response.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise NaverAPIError(
-                f"Naver place page failed (HTTP {exc.response.status_code})"
-            ) from exc
-        except httpx.RequestError as exc:
-            raise NaverAPIError(f"Naver place page failed: {exc}") from exc
+    async def _fetch() -> PlaceDetail:
+        async with httpx.AsyncClient(
+            headers=_HEADERS, cookies=cookies, follow_redirects=True
+        ) as client:
+            try:
+                response = await client.get(url, params=default_params)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                raise NaverAPIError(
+                    f"Naver place page failed (HTTP {exc.response.status_code})"
+                ) from exc
+            except httpx.RequestError as exc:
+                raise NaverAPIError(f"Naver place page failed: {exc}") from exc
 
-    state = _extract_apollo_state(response.text)
-    return _parse_place_detail(place_id, state)
+        state = _extract_apollo_state(response.text)
+        return _parse_place_detail(place_id, state)
+
+    key = ("detail", place_id, tuple(sorted(default_params.items())))
+    return await cache.get_or_set(key, _fetch)

@@ -1,11 +1,13 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from .base import DropNoneModel
 
 
-class ReviewInfo(BaseModel):
+class ReviewInfo(DropNoneModel):
     count: str = ""
 
 
-class PlaceItem(BaseModel):
+class PlaceItem(DropNoneModel):
     id: str
     title: str
     x: str  # longitude
@@ -23,7 +25,7 @@ class PlaceItem(BaseModel):
     type: str = "place"
 
 
-class InstantSearchResponse(BaseModel):
+class InstantSearchResponse(DropNoneModel):
     meta: dict = Field(default_factory=dict)
     ac: list[str] = Field(default_factory=list)
     place: list[PlaceItem] = Field(default_factory=list)

@@ -120,23 +120,32 @@ def search(query, coords, near, enrich, top, as_json):
             cookies = get_session_cookies()
         except Exception as exc:
             _err(str(exc))
-        items, _used = await _search_places(query, cookies, coords=coords, near=near)
+        items, searched_near = await _search_places(query, cookies, coords=coords, near=near)
         if enrich:
             from .client import enrich_places
             pairs = await enrich_places(items, cookies, top=top)
-            return views.enriched_search_results(pairs)
-        return views.search_results(items)
+            return views.enriched_search_results(pairs), searched_near
+        return views.search_results(items), searched_near
 
-    results = asyncio.run(_run())
+    results, searched_near = asyncio.run(_run())
 
     if as_json:
-        _json_out(results)
+        _json_out({"searchedNear": searched_near, "places": results})
         return
 
     if not results:
         click.echo("No results found.")
         return
 
+    # Show how the search was centered (lets you catch a wrong geocode).
+    if searched_near["source"] == "near":
+        click.echo(click.style(
+            f"\n📍 '{near}' → {searched_near['resolvedTo']} ({searched_near['coords']})",
+            fg="bright_black"))
+    elif searched_near["source"] == "default":
+        click.echo(click.style(
+            "\n⚠ 좌표 미지정 — 거리는 서울 중심 기준 (정확하지 않음). --near 권장.",
+            fg="yellow"))
     click.echo(click.style(f"\n검색 결과: {query}  ({len(results)}건)\n", bold=True))
     for i, r in enumerate(results, 1):
         dist_str = f"📍 {r['distanceKm']:.2f} km" if r["distanceKm"] else ""
