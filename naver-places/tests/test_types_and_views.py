@@ -128,6 +128,39 @@ def test_merged_places_falls_back_to_all():
     assert [p.id for p in merged] == ["2"]
 
 
+def test_enriched_search_results_merges_detail():
+    from naver_places.types.place import PlaceDetail
+
+    item = PlaceItem.model_validate(
+        {"id": "1", "title": "A", "x": "127", "y": "37", "ctg": "한식",
+         "review": {"count": "10"}}
+    )
+    detail = PlaceDetail(id="1", name="A", phone="02-1", visitorReviewsScore=4.5,
+                         visitorReviewsTotal=99, cafeBlogReviewsTotal=7)
+    rows = views.enriched_search_results([(item, detail), (item, None)])
+    # Enriched row carries the real rating + phone from detail.
+    assert rows[0]["score"] == 4.5
+    assert rows[0]["visitorReviewTotal"] == 99
+    assert rows[0]["phone"] == "02-1"
+    # Failed detail fetch degrades gracefully to null score, not an error.
+    assert rows[1]["score"] is None
+    assert rows[1]["topKeywords"] == []
+
+
+def test_naverblog_accepts_object():
+    # Regression: some places return naverBlog/talktalkUrl as an object, which
+    # previously failed the whole detail parse.
+    state = {
+        "PlaceDetailBase:9": {
+            "name": "X",
+            "naverBlog": {"url": "http://x"},
+            "talktalkUrl": {"url": "http://t"},
+        },
+    }
+    detail = _parse_place_detail("9", state)
+    assert detail.name == "X"
+
+
 def test_place_detail_parse_and_view():
     state = {
         "PlaceDetailBase:1": {

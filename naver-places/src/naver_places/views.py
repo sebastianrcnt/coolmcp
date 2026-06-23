@@ -45,6 +45,43 @@ def search_results(items: list[PlaceItem]) -> list[dict]:
     return result
 
 
+def enriched_search_results(
+    pairs: list[tuple[PlaceItem, "PlaceDetail | None"]],
+) -> list[dict]:
+    """Merge each search result with its place detail in one projection.
+
+    Used by search_places(enrich=True). Each row carries the lean search fields
+    plus the real 0-5 `score`, `visitorReviewTotal`, `phone`, and `topKeywords`
+    from detail — so an agent needs a single call instead of search + N details.
+    `score` is null when the detail fetch failed for that place.
+    """
+    rows = []
+    for item, detail in pairs:
+        row = {
+            "id": item.id,
+            "title": item.title,
+            "category": item.ctg,
+            "roadAddress": item.roadAddress,
+            "distanceKm": round(item.dist, 2),
+            "reviewCount": _as_int(item.review.count, default=0),
+            "rankingScore": item.totalScore,
+            "lat": item.y,
+            "lng": item.x,
+        }
+        if detail is not None:
+            dv = place_detail(detail)
+            row["score"] = dv["score"]
+            row["visitorReviewTotal"] = dv["visitorReviewTotal"]
+            row["blogReviewTotal"] = dv["blogReviewTotal"]
+            row["phone"] = dv["phone"]
+            row["topKeywords"] = dv["topKeywords"]
+        else:
+            row["score"] = None
+            row["topKeywords"] = []
+        rows.append(row)
+    return rows
+
+
 def place_detail(d: PlaceDetail) -> dict:
     """Project PlaceDetail to lean detail view."""
     # Extract topKeywords safely

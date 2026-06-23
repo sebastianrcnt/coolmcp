@@ -72,6 +72,8 @@ class PlaceDetail(BaseModel):
     visitorReviewsScore: float = 0.0
     cafeBlogReviewsTotal: int = 0
     reviewSummary: PlaceReviewSummary | None = None
-    naverBlog: str | None = None
-    talktalkUrl: str | None = None
+    # Naver returns either a URL string or a structured object for these,
+    # depending on the place, so accept both rather than failing the whole parse.
+    naverBlog: dict | str | None = None
+    talktalkUrl: dict | str | None = None
     isGoodStore: bool = False

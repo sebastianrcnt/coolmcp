@@ -103,14 +103,17 @@ def profiles():
               help="Explicit center for distance ranking (default: Seoul City Hall)")
 @click.option("--near", default=None, metavar="LANDMARK",
               help="Landmark/area to search around, auto-geocoded (e.g. 성균관대)")
+@click.option("--enrich", is_flag=True,
+              help="Attach rating/keywords to the top results (one call, no per-place detail)")
+@click.option("--top", default=3, show_default=True, help="How many results to enrich with --enrich")
 @click.option("--json", "as_json", is_flag=True, help="Output raw JSON")
-def search(query, coords, near, as_json):
+def search(query, coords, near, enrich, top, as_json):
     """Search Naver Maps for places matching QUERY.
 
     QUERY should be a short keyword (dish/business name), not a sentence.
     Put the location in --near, not in QUERY.
 
-    Example: naver-places search "순두부찌개" --near "성균관대"
+    Example: naver-places search "순두부찌개" --near "성균관대" --enrich
     """
     async def _run():
         try:
@@ -118,6 +121,10 @@ def search(query, coords, near, as_json):
         except Exception as exc:
             _err(str(exc))
         items, _used = await _search_places(query, cookies, coords=coords, near=near)
+        if enrich:
+            from .client import enrich_places
+            pairs = await enrich_places(items, cookies, top=top)
+            return views.enriched_search_results(pairs)
         return views.search_results(items)
 
     results = asyncio.run(_run())
@@ -139,7 +146,14 @@ def search(query, coords, near, as_json):
             f"{click.style(r['category'], fg='yellow')}  {dist_str}"
         )
         click.echo(f"     {r['roadAddress']}")
-        click.echo(f"     리뷰 {r['reviewCount']:,}건  ·  ID: {r['id']}")
+        # Enriched rows carry the real 0-5 rating + keywords.
+        if "score" in r and r["score"] is not None:
+            kws = "  ".join(k["name"] for k in r.get("topKeywords", [])[:4])
+            click.echo(f"     {_star(r['score'])}  리뷰 {r['reviewCount']:,}건  ·  ID: {r['id']}")
+            if kws:
+                click.echo(click.style(f"     🔖 {kws}", fg="bright_black"))
+        else:
+            click.echo(f"     리뷰 {r['reviewCount']:,}건  ·  ID: {r['id']}")
         click.echo()
 
 

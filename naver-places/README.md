@@ -39,7 +39,7 @@ Use the `list_available_chrome_profiles` tool to see which profile names exist o
 
 ## Tools
 
-- `search_places(query, coords=None, near=None)` — search places by keyword. `query` should be a short keyword (dish or business name), not a sentence with a location in it — use `near` instead. `near` is a landmark name (e.g. "성균관대") that gets auto-geocoded to coordinates for distance ranking. `coords` is an alternative "lat,lng" string for explicit coordinates; if both are omitted a default Seoul-center coordinate is used. Note: search returns `rankingScore` (Naver's internal relevance weight, NOT a 0-5 rating); the real 0-5 rating comes from `get_place_detail` (`score`).
+- `search_places(query, coords=None, near=None, enrich=False, top=3)` — search places by keyword. `query` should be a short keyword (dish or business name), not a sentence with a location in it — use `near` instead. `near` is a landmark name (e.g. "성균관대") that gets auto-geocoded to coordinates for distance ranking. `coords` is an alternative "lat,lng" string for explicit coordinates; if both are omitted a default Seoul-center coordinate is used. Note: search returns `rankingScore` (Naver's internal relevance weight, NOT a 0-5 rating); the real 0-5 rating comes from `get_place_detail` (`score`). When `enrich=True`, the top `top` results also include the real 0-5 `score`, `visitorReviewTotal`, `phone`, and `topKeywords` — fetched in one call instead of calling `get_place_detail` per candidate (saves round trips). `score` is null if a place's detail couldn't be fetched.
 - `get_place_detail(place_id)` — name, address, phone, score, review totals, and top review keywords.
 - `get_place_visitor_reviews(place_id, size=10, after=None)` — visitor reviews; `after` is a pagination cursor.
 - `get_place_images(place_id=None, urls=None, limit=5)` — returns review photos as viewable image content (the model can see them; videos skipped). Image bytes are token-expensive: prefer calling `get_place_review_photos` first for cheap URLs, then pass the URLs you want to view as `urls`. Only Naver CDN URLs are accepted.
@@ -59,7 +59,7 @@ uv run --package naver-places naver-places <cmd>
 
 Commands:
 
-- `search QUERY [--near LANDMARK] [--coords LAT,LNG] [--json]` — search places. Use a short keyword for QUERY (dish/business name); put location in --near (e.g. `search "순두부찌개" --near "성균관대"`), NOT in QUERY.
+- `search QUERY [--near LANDMARK] [--coords LAT,LNG] [--enrich] [--top N] [--json]` — search places. Use a short keyword for QUERY (dish/business name); put location in --near (e.g. `search "순두부찌개" --near "성균관대"`), NOT in QUERY. Use `--enrich` to attach rating, review count, phone, and keywords to the top results in one call (e.g. `search "순두부찌개" --near "성균관대" --enrich`).
 - `detail PLACE_ID [--json]` — place details.
 - `reviews PLACE_ID [--size N] [--after CURSOR] [--json]` — visitor reviews.
 - `review-photos PLACE_ID [--json]` — review photo metadata.

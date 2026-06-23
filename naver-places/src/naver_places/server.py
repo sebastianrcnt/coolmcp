@@ -2,6 +2,7 @@ from fastmcp import FastMCP
 from fastmcp.utilities.types import Image
 
 from .client import (
+    enrich_places,
     get_following_reviews,
     get_photo_viewer,
     get_review_photos,
@@ -53,6 +54,8 @@ async def search_places(
     query: str,
     coords: str | None = None,
     near: str | None = None,
+    enrich: bool = False,
+    top: int = 3,
 ) -> list[dict]:
     """Search Naver Maps for places by keyword.
 
@@ -69,18 +72,29 @@ async def search_places(
     - If you pass neither, a default Seoul-center point is used and `distanceKm`
       will be relative to that, so it is meaningless for local queries.
 
+    Enrichment (saves round trips): set `enrich=True` to also fetch the real
+    0–5 `score`, `visitorReviewTotal`, `phone`, and `topKeywords` for the top
+    `top` results in one call — instead of calling get_place_detail yourself for
+    each candidate. Use this when comparing places; leave it off for a quick
+    lookup. `score` is null if a place's detail could not be fetched.
+
     Result fields: `rankingScore` is Naver's internal relevance weight (NOT a
-    0–5 rating — get the real rating from get_place_detail). Results are ranked,
-    not strictly filtered, so categories may be mixed.
+    0–5 rating). Without enrich, the real rating only comes from
+    get_place_detail. Results are ranked, not strictly filtered, so categories
+    may be mixed.
 
     Args:
         query: Short keyword in Korean or English (e.g. "순두부찌개", "starbucks")
         coords: Optional explicit "lat,lng" center for ranking/distance
         near: Optional landmark/area name to search around (auto-geocoded)
+        enrich: If True, attach detail (rating/keywords) to the top results
+        top: How many results to enrich when enrich=True (default 3)
     """
-    items, _ = await _search_places(
-        query, get_session_cookies(), coords=coords, near=near
-    )
+    cookies = get_session_cookies()
+    items, _ = await _search_places(query, cookies, coords=coords, near=near)
+    if enrich:
+        pairs = await enrich_places(items, cookies, top=top)
+        return views.enriched_search_results(pairs)
     return views.search_results(items)
 
 

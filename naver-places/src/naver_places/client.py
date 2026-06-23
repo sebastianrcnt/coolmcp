@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 
 from .graphql.client import NaverPlaceGraphQLClient
@@ -11,6 +13,8 @@ from .types import (
     ThemeListsResult,
     VisitorReviewsResult,
 )
+from .types.place import PlaceDetail
+from .types.search import PlaceItem
 
 INSTANT_SEARCH_URL = "https://map.naver.com/p/api/search/instant-search"
 
@@ -102,6 +106,33 @@ async def search_places(
 
     response = await instant_search(query, used_coords, cookies)
     return response.merged_places(), used_coords
+
+
+async def enrich_places(
+    items: list[PlaceItem],
+    cookies: dict[str, str],
+    top: int,
+) -> list[tuple[PlaceItem, PlaceDetail | None]]:
+    """Fetch place details for the first `top` items concurrently.
+
+    Collapses the search→detail round trips: instead of the agent calling
+    get_place_detail once per candidate, the server fans out in parallel here.
+    A failed detail fetch yields (item, None) rather than aborting the batch.
+    """
+    # Imported lazily to avoid a module-load cycle (html imports nothing from
+    # client, but keep the dependency direction explicit at call time).
+    from .html import fetch_place_detail
+
+    targets = items[: max(0, top)]
+
+    async def _one(item: PlaceItem) -> tuple[PlaceItem, PlaceDetail | None]:
+        try:
+            detail = await fetch_place_detail(item.id, cookies)
+            return item, detail
+        except Exception:
+            return item, None
+
+    return await asyncio.gather(*(_one(it) for it in targets))
 
 
 async def get_visitor_reviews(
