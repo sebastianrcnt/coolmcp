@@ -19,7 +19,16 @@ def _as_int(value, default=0):
 
 
 def search_results(items: list[PlaceItem]) -> list[dict]:
-    """Project PlaceItems to lean search results."""
+    """Project PlaceItems to lean search results.
+
+    NOTE on fields:
+    - `rankingScore` is Naver's internal relevance/popularity weight (roughly
+      0–200+), NOT a user rating. Do not show it as a star score. The 0–5
+      visitor rating only comes from get_place_detail (`score`).
+    - `distanceKm` is measured from the `coords` you passed to the search (or
+      the default Seoul-center point if you passed none), so it is only
+      meaningful when you supplied coordinates near your area of interest.
+    """
     result = []
     for item in items:
         result.append({
@@ -29,7 +38,7 @@ def search_results(items: list[PlaceItem]) -> list[dict]:
             "roadAddress": item.roadAddress,
             "distanceKm": round(item.dist, 2),
             "reviewCount": _as_int(item.review.count, default=0),
-            "score": item.totalScore,
+            "rankingScore": item.totalScore,
             "lat": item.y,
             "lng": item.x,
         })
@@ -61,8 +70,12 @@ def place_detail(d: PlaceDetail) -> dict:
         "roadAddress": d.roadAddress,
         "address": d.address,
         "phone": d.phone,
+        # 0–5 visitor rating (this is the real star score, unlike search's rankingScore).
         "score": d.visitorReviewsScore,
-        "reviewTotal": d.visitorReviewsTotal,
+        # All visitor reviews, including photo/receipt/rating-only ones. This is
+        # typically LARGER than the `total` from get_place_visitor_reviews, which
+        # counts only the text reviews in that feed.
+        "visitorReviewTotal": d.visitorReviewsTotal,
         "blogReviewTotal": d.cafeBlogReviewsTotal,
         "ratingCount": ratingCount,
         "topKeywords": topKeywords,
@@ -70,7 +83,12 @@ def place_detail(d: PlaceDetail) -> dict:
 
 
 def visitor_reviews(r: VisitorReviewsResult) -> dict:
-    """Project VisitorReviewsResult to lean reviews view."""
+    """Project VisitorReviewsResult to lean reviews view.
+
+    `total` here is the count of TEXT reviews in this feed. It is usually lower
+    than get_place_detail's `visitorReviewTotal`, which also counts
+    rating-only / receipt / photo reviews. Use `nextCursor` to page.
+    """
     reviews_list = []
     next_cursor = None
 

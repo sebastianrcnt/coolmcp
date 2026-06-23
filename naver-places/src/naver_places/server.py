@@ -7,7 +7,7 @@ from .client import (
     get_review_photos,
     get_theme_lists,
     get_visitor_reviews,
-    instant_search,
+    search_places as _search_places,
 )
 from .cookies import list_chrome_profiles
 from .html import fetch_place_detail
@@ -16,10 +16,6 @@ from .session import check_naver_login, get_session_cookies
 from . import views
 
 mcp = FastMCP("naver-places")
-
-# Default map center (Seoul City Hall) used when no coords are given.
-# Naver instant-search requires coords; they only affect distance ranking.
-DEFAULT_COORDS = "37.5666,126.9784"
 
 
 @mcp.tool
@@ -35,27 +31,57 @@ def list_available_chrome_profiles() -> list[str]:
 
 @mcp.tool
 def check_naver_auth() -> dict:
-    """Check whether the configured Chrome profile has a usable Naver session.
+    """Check whether Naver tools will work, and in what mode.
 
-    Reports cookieCount, hasNaverSession (public search/reviews work),
-    isLoggedIn (personalized features like following reviews work), and a
-    human-readable message. Call this first if other tools return empty results
-    or fail with an authentication error.
+    Reports:
+    - mode: "logged_in" (Chrome session found), "anonymous" (no login but the
+      anonymous fallback is enabled), or "none".
+    - publicToolsWork: if true, search_places / get_place_detail /
+      get_place_visitor_reviews / photos all work — even in anonymous mode.
+      Do NOT abandon those tools just because isLoggedIn is false.
+    - isLoggedIn: only personalized tools (get_place_following_reviews) need this.
+    - cookieCount, hasNaverSession, message.
+
+    Most public tasks need no login. Call this first only if a tool returns
+    empty results or an auth error.
     """
     return check_naver_login()
 
 
 @mcp.tool
-async def search_places(query: str, coords: str | None = None) -> list[dict]:
-    """Search Naver Maps for places matching a keyword.
+async def search_places(
+    query: str,
+    coords: str | None = None,
+    near: str | None = None,
+) -> list[dict]:
+    """Search Naver Maps for places by keyword.
+
+    This is an AUTOCOMPLETE-style search, not full-text. Use a SHORT keyword:
+    a dish or business name like "순두부찌개" or "스타벅스". Do NOT put a
+    location in `query` (e.g. "성균관대 순두부찌개" returns nothing) — pass the
+    location via `near` or `coords` instead.
+
+    Location handling (controls distance ranking AND `distanceKm` in results):
+    - `near`: a landmark/area name (e.g. "성균관대"). It is geocoded to
+      coordinates automatically, so this is the easiest way to search "around X".
+    - `coords`: an explicit "lat,lng" string (e.g. "37.5872,126.9930"). Takes
+      precedence over `near`.
+    - If you pass neither, a default Seoul-center point is used and `distanceKm`
+      will be relative to that, so it is meaningless for local queries.
+
+    Result fields: `rankingScore` is Naver's internal relevance weight (NOT a
+    0–5 rating — get the real rating from get_place_detail). Results are ranked,
+    not strictly filtered, so categories may be mixed.
 
     Args:
-        query: Search term in Korean or English (e.g. "파리바게트", "starbucks")
-        coords: Optional "lat,lng" string (e.g. "37.5144,127.0667"). Only affects
-                distance ranking; if omitted a default Seoul-center coordinate is used.
+        query: Short keyword in Korean or English (e.g. "순두부찌개", "starbucks")
+        coords: Optional explicit "lat,lng" center for ranking/distance
+        near: Optional landmark/area name to search around (auto-geocoded)
     """
-    response = await instant_search(query, coords or DEFAULT_COORDS, get_session_cookies())
-    return views.search_results(response.place)
+    items, _ = await _search_places(
+        query, get_session_cookies(), coords=coords, near=near
+    )
+    return views.search_results(items)
 
 
 @mcp.tool

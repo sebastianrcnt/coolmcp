@@ -797,6 +797,7 @@ name = "naver-places"
 version = "0.1.0"
 source = { editable = "naver-places" }
 dependencies = [
+    { name = "click" },
     { name = "fastmcp" },
     { name = "gql" },
     { name = "httpx" },
@@ -811,6 +812,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "click", specifier = ">=8.1" },
     { name = "fastmcp", specifier = ">=3.4.2" },
     { name = "gql", specifier = ">=4.0.0" },
     { name = "httpx", specifier = ">=0.28" },

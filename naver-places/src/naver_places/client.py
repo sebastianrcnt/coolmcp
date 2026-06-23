@@ -14,6 +14,10 @@ from .types import (
 
 INSTANT_SEARCH_URL = "https://map.naver.com/p/api/search/instant-search"
 
+# Default map center (Seoul City Hall) used when no coords/near are given.
+# Naver instant-search requires coords; they only affect distance ranking.
+DEFAULT_COORDS = "37.5666,126.9784"
+
 # Initial cursor for the photo viewer: start of the visitor-review photo section.
 _INITIAL_PHOTO_CURSORS = [
     {"id": "placeReview", "startIndex": 0, "hasNext": True, "lastCursor": None}
@@ -63,6 +67,41 @@ async def instant_search(
         except httpx.RequestError as exc:
             raise NaverAPIError(f"Naver search failed: {exc}") from exc
         return InstantSearchResponse.model_validate(response.json())
+
+
+async def resolve_coords(near: str, cookies: dict[str, str]) -> str | None:
+    """Geocode a landmark/place name to a "lat,lng" string via instant-search.
+
+    Returns the coordinates of the top matching place, or None if nothing
+    matched. Used so callers can search "near 성균관대" without knowing lat/lng.
+    """
+    response = await instant_search(near, DEFAULT_COORDS, cookies)
+    places = response.merged_places()
+    if not places:
+        return None
+    top = places[0]
+    return f"{top.y},{top.x}"
+
+
+async def search_places(
+    query: str,
+    cookies: dict[str, str],
+    coords: str | None = None,
+    near: str | None = None,
+) -> tuple[list, str]:
+    """Search places, resolving `near` to coordinates when given.
+
+    Resolution order for the ranking center: explicit `coords` > geocoded
+    `near` > DEFAULT_COORDS. Returns (merged place items, coords actually used).
+    """
+    used_coords = coords
+    if used_coords is None and near:
+        used_coords = await resolve_coords(near, cookies)
+    if used_coords is None:
+        used_coords = DEFAULT_COORDS
+
+    response = await instant_search(query, used_coords, cookies)
+    return response.merged_places(), used_coords
 
 
 async def get_visitor_reviews(

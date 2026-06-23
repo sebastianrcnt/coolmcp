@@ -11,7 +11,7 @@ No network access.
 from naver_places import views
 from naver_places.types.photos import ReviewPhoto, PhotoViewerResult
 from naver_places.types.reviews import VisitorReviewsResult
-from naver_places.types.search import PlaceItem
+from naver_places.types.search import PlaceItem, InstantSearchResponse
 from naver_places.html import _parse_place_detail
 from naver_places.graphql.client import _operation_name
 from naver_places.graphql import queries
@@ -101,10 +101,31 @@ def test_search_results_projection():
         "roadAddress": "서울 강남",
         "distanceKm": 1.23,
         "reviewCount": 42,
-        "score": 200.5,
+        "rankingScore": 200.5,
         "lat": "37.5",
         "lng": "127.0",
     }
+
+
+def test_merged_places_prefers_place():
+    resp = InstantSearchResponse.model_validate({
+        "place": [{"id": "1", "title": "A", "x": "127", "y": "37"}],
+        "all": [{"place": {"id": "2", "title": "B", "x": "127", "y": "37"}}],
+    })
+    merged = resp.merged_places()
+    assert [p.id for p in merged] == ["1"]  # place wins, all ignored
+
+
+def test_merged_places_falls_back_to_all():
+    resp = InstantSearchResponse.model_validate({
+        "place": [],
+        "all": [
+            {"place": {"id": "2", "title": "B", "x": "127", "y": "37"}},
+            {"address": None, "bus": None},  # non-place entry skipped
+        ],
+    })
+    merged = resp.merged_places()
+    assert [p.id for p in merged] == ["2"]
 
 
 def test_place_detail_parse_and_view():
@@ -138,7 +159,7 @@ def test_place_detail_parse_and_view():
     assert view["name"] == "룰루레몬 강남"
     assert view["category"] == ["의류", "스포츠"]
     assert view["score"] == 4.25
-    assert view["reviewTotal"] == 213
+    assert view["visitorReviewTotal"] == 213
     assert view["ratingCount"] == 87
     assert view["topKeywords"] == [{"name": "품질이 좋아요", "count": 113}]
 

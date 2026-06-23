@@ -100,7 +100,7 @@ async def fetch_place_detail(
     if params:
         default_params.update(params)
 
-    async with httpx.AsyncClient(headers=_HEADERS, cookies=cookies) as client:
+    async with httpx.AsyncClient(headers=_HEADERS, cookies=cookies, follow_redirects=True) as client:
         try:
             response = await client.get(url, params=default_params)
             response.raise_for_status()

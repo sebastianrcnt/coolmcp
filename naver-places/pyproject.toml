@@ -4,12 +4,16 @@ version = "0.1.0"
 description = "Naver Places MCP server"
 requires-python = ">=3.11"
 dependencies = [
+    "click>=8.1",
     "fastmcp>=3.4.2",
     "gql>=4.0.0",
     "httpx>=0.28",
     "pillow>=12.2.0",
     "pycookiecheat>=0.8.0",
 ]
+
+[project.scripts]
+naver-places = "naver_places.cli:cli"
 
 [build-system]
 requires = ["hatchling"]

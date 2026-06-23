@@ -29,3 +29,23 @@ class InstantSearchResponse(BaseModel):
     place: list[PlaceItem] = Field(default_factory=list)
     address: list = Field(default_factory=list)
     bus: list = Field(default_factory=list)
+    # The "all" section interleaves place/address/bus hits. Naver sometimes
+    # populates it even when the top-level `place` array is empty, so it is a
+    # useful fallback for recall.
+    all_results: list[dict] = Field(default_factory=list, alias="all")
+
+    def merged_places(self) -> list[PlaceItem]:
+        """Return `place`, falling back to place hits inside `all` when empty.
+
+        Naver's instant-search is an autocomplete endpoint; for some queries it
+        leaves `place` empty while `all` still carries place items. Merging
+        recovers those without changing results when `place` is already filled.
+        """
+        if self.place:
+            return self.place
+        recovered: list[PlaceItem] = []
+        for entry in self.all_results:
+            raw = entry.get("place") if isinstance(entry, dict) else None
+            if raw:
+                recovered.append(PlaceItem.model_validate(raw))
+        return recovered
